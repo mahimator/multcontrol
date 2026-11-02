@@ -1,0 +1,60 @@
+[package]
+name = "mc-agent"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "multcontrol agent: shares one keyboard and mouse between a Windows PC and a Mac"
+
+[dependencies]
+mc-core = { path = "../mc-core" }
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+log.workspace = true
+env_logger.workspace = true
+rand.workspace = true
+dirs = "5"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.10"
+core-graphics = { version = "0.24", features = ["highsierra"] }
+objc2 = "0.5"
+objc2-foundation = { version = "0.2", features = [
+    "NSString",
+    "NSArray",
+    "NSDate",
+    "NSRunLoop",
+    "NSThread",
+    "NSURL",
+    "NSValue",
+] }
+objc2-app-kit = { version = "0.2", features = [
+    "NSApplication",
+    "NSMenu",
+    "NSMenuItem",
+    "NSStatusBar",
+    "NSStatusItem",
+    "NSPasteboard",
+    "NSResponder",
+    "NSRunningApplication",
+    "NSText",
+] }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_System_DataExchange",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Memory",
+    "Win32_System_Registry",
+    "Win32_System_SystemInformation",
+    "Win32_System_Threading",
+    "Win32_UI_HiDpi",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[[bin]]
+name = "multcontrol"
+path = "src/main.rs"
