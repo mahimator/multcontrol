@@ -119,11 +119,6 @@ cat >"$AGENT_PLIST" <<EOF
     </dict>
     <key>ProcessType</key>
     <string>Interactive</string>
-    <key>EnvironmentVariables</key>
-    <dict>
-        <key>MULTControl_NO_PROMPT</key>
-        <string>1</string>
-    </dict>
     <key>StandardOutPath</key>
     <string>$SUPPORT_DIR/stdout.log</string>
     <key>StandardErrorPath</key>

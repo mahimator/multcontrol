@@ -31,7 +31,21 @@ $config = Join-Path $configDir "config.toml"
 $runKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
 
 if ([string]::IsNullOrWhiteSpace($Source)) {
-    $Source = Join-Path $PSScriptRoot "..\target\release\multcontrol.exe"
+    # Repo layout first, then the layout people get from the release page
+    # (install-windows.ps1 and multcontrol.exe side by side).
+    $candidates = @(
+        (Join-Path $PSScriptRoot "..\target\release\multcontrol.exe"),
+        (Join-Path $PSScriptRoot "multcontrol.exe")
+    )
+    foreach ($candidate in $candidates) {
+        if (Test-Path $candidate) {
+            $Source = $candidate
+            break
+        }
+    }
+    if ([string]::IsNullOrWhiteSpace($Source)) {
+        $Source = $candidates[0]
+    }
 }
 if (-not (Test-Path $Source)) {
     throw @"

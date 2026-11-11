@@ -7,3 +7,9 @@
 
 # Logs and local config
 *.log
+
+# Release artifacts
+/dist/
+
+# Generated application icon (see scripts/make-icon.py)
+/assets/

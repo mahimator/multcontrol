@@ -13,9 +13,12 @@
 mod app;
 mod clipboard;
 mod control_socket;
+mod gui;
 mod input;
 mod net;
-mod ui;
+mod selftest;
+#[cfg(windows)]
+mod tray;
 
 use anyhow::{Context, Result};
 use app::{Agent, Event, Status};
@@ -122,6 +125,7 @@ fn main() {
             }
         },
         "doctor" => doctor(),
+        "selftest" => selftest::run(),
         "version" | "--version" | "-V" => {
             println!("multcontrol {}", env!("CARGO_PKG_VERSION"));
             0
@@ -155,7 +159,8 @@ fn usage() {
          \x20 psk       print this machine's pairing key\n\
          \x20 where     print the config and log locations\n\
          \x20 discover  find the Mac on the local network\n\
-         \x20 doctor    check permissions, ports and config",
+         \x20 doctor    check permissions, ports and config\n\
+         \x20 selftest  verify this binary works here (installs nothing)",
         env!("CARGO_PKG_VERSION")
     );
 }
@@ -342,7 +347,8 @@ fn run_agent() -> Result<()> {
     let agent = Agent::new(cfg.clone(), backend.clone(), hotkey, events_rx, status_cb);
     agent.start_capture(events_tx.clone())?;
 
-    let trusted = check_permission();
+    // Prompt for Accessibility (macOS) — side effects only, result handled by UI.
+    let _ = check_permission();
 
     let running = Arc::new(AtomicBool::new(true));
     let agent_running = running.clone();
@@ -354,8 +360,29 @@ fn run_agent() -> Result<()> {
         })
         .context("spawning control loop")?;
 
-    // The UI owns the main thread (NSApplication on macOS).
-    ui::run(status_rx, running.clone(), trusted);
+    // Bridge GUI menu commands (Toggle/Local/Remote/Quit) into the agent's
+    // control channel so the tray icon / menu bar can drive the agent.
+    let (gui_tx, gui_rx) = channel::<gui::GuiCommand>();
+    let events_tx_for_gui = events_tx.clone();
+    std::thread::Builder::new()
+        .name("mc-gui-bridge".into())
+        .spawn(move || {
+            for cmd in gui_rx {
+                let command = match cmd {
+                    gui::GuiCommand::Toggle => control_socket::Command::Toggle,
+                    gui::GuiCommand::Local => control_socket::Command::Local,
+                    gui::GuiCommand::Remote => control_socket::Command::Remote,
+                    gui::GuiCommand::Quit => control_socket::Command::Quit,
+                };
+                if events_tx_for_gui.send(Event::Command(command)).is_err() {
+                    break;
+                }
+            }
+        })
+        .context("spawning GUI bridge")?;
+
+    // The UI owns the main thread (NSApplication on macOS, message loop on Windows).
+    gui::run(status_rx, gui_tx, running.clone());
 
     let _ = events_tx.send(Event::Command(control_socket::Command::Quit));
     let _ = agent_thread.join();
@@ -390,16 +417,13 @@ fn check_permission() -> bool {
         let trusted = input::accessibility_trusted();
         if !trusted {
             log::warn!(
-                "Accessibility permission is not granted. Open System Settings > Privacy & Security \
-                 > Accessibility and enable MultControl; the agent retries automatically."
+                "Accessibility permission is not granted. macOS will ask; enable MultControl in \
+                 System Settings > Privacy & Security > Accessibility. The agent retries \
+                 automatically."
             );
-            // Helpful on a manual start, annoying when launchd starts the
-            // agent at login; the LaunchAgent sets MULTControl_NO_PROMPT.
-            if std::env::var_os("MULTControl_NO_PROMPT").is_none() {
-                let _ = std::process::Command::new("open")
-                    .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
-                    .spawn();
-            }
+            // This is what adds the app to the Accessibility list; without it
+            // the user has to add the binary by hand.
+            input::prompt_for_accessibility();
         }
         trusted
     }

@@ -73,6 +73,9 @@ struct HookState {
     /// otherwise looks exactly like the user pushing through it.
     edge_guard_ms: AtomicU64,
     thread_id: AtomicU32,
+    /// Whether the hooks were installed, so `start` can report failure instead
+    /// of returning success and silently capturing nothing.
+    start_result: Mutex<Option<Result<(), String>>>,
 }
 
 static STATE: OnceLock<Arc<HookState>> = OnceLock::new();
@@ -421,6 +424,7 @@ impl super::Backend for WindowsBackend {
             edge_latched: AtomicBool::new(false),
             edge_guard_ms: AtomicU64::new(0),
             thread_id: AtomicU32::new(0),
+            start_result: Mutex::new(None),
         });
         STATE
             .set(state.clone())
@@ -438,6 +442,8 @@ impl super::Backend for WindowsBackend {
                     Ok(h) => h,
                     Err(e) => {
                         log::error!("keyboard hook failed: {e}");
+                        *thread_state.start_result.lock().unwrap() =
+                            Some(Err(format!("keyboard hook failed: {e}")));
                         return;
                     }
                 };
@@ -446,9 +452,12 @@ impl super::Backend for WindowsBackend {
                     Err(e) => {
                         log::error!("mouse hook failed: {e}");
                         let _ = UnhookWindowsHookEx(kb_hook);
+                        *thread_state.start_result.lock().unwrap() =
+                            Some(Err(format!("mouse hook failed: {e}")));
                         return;
                     }
                 };
+                *thread_state.start_result.lock().unwrap() = Some(Ok(()));
                 log::info!("low-level input hooks installed (no administrator rights needed)");
                 let mut msg = MSG::default();
                 while GetMessageW(&mut msg, None, 0, 0).0 > 0 {
@@ -461,12 +470,20 @@ impl super::Backend for WindowsBackend {
             })
             .context("spawning input hook thread")?;
 
-        for _ in 0..100 {
-            if state.thread_id.load(Ordering::SeqCst) != 0 {
-                break;
+        // Wait for the hooks themselves, not just the thread: a policy or a
+        // locked-down session can make SetWindowsHookEx fail, and pretending
+        // to be started would leave the user with a silent, dead agent.
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+        let result = loop {
+            if let Some(result) = state.start_result.lock().unwrap().take() {
+                break result;
+            }
+            if std::time::Instant::now() >= deadline {
+                break Err("timed out installing the input hooks".to_string());
             }
             std::thread::sleep(std::time::Duration::from_millis(10));
-        }
+        };
+        result.map_err(|e| anyhow::anyhow!(e))?;
         self.started.store(true, Ordering::SeqCst);
         Ok(())
     }

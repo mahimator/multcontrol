@@ -16,11 +16,15 @@ env_logger.workspace = true
 rand.workspace = true
 dirs = "5"
 
+[build-dependencies]
+winres = "0.1"
+
 [target.'cfg(target_os = "macos")'.dependencies]
 core-foundation = "0.10"
 core-graphics = { version = "0.24", features = ["highsierra"] }
 objc2 = "0.5"
 objc2-foundation = { version = "0.2", features = [
+    "NSBundle",
     "NSString",
     "NSArray",
     "NSDate",
@@ -31,6 +35,7 @@ objc2-foundation = { version = "0.2", features = [
 ] }
 objc2-app-kit = { version = "0.2", features = [
     "NSApplication",
+    "NSImage",
     "NSMenu",
     "NSMenuItem",
     "NSStatusBar",
@@ -49,10 +54,14 @@ windows = { version = "0.58", features = [
     "Win32_System_Memory",
     "Win32_System_Registry",
     "Win32_System_SystemInformation",
+    "Win32_System_SystemServices",
     "Win32_System_Threading",
+    "Win32_UI_Controls",
     "Win32_UI_HiDpi",
     "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Shell",
     "Win32_UI_WindowsAndMessaging",
+    "Win32_Graphics_Gdi",
 ] }
 
 [[bin]]

@@ -44,11 +44,35 @@ extern "C" {
 #[link(name = "ApplicationServices", kind = "framework")]
 extern "C" {
     fn AXIsProcessTrusted() -> bool;
+    fn AXIsProcessTrustedWithOptions(options: *const core::ffi::c_void) -> u8;
 }
 
 /// Whether this process may capture and post input events.
 pub fn accessibility_trusted() -> bool {
     unsafe { AXIsProcessTrusted() }
+}
+
+/// Ask macOS to show the standard "would like to control this computer"
+/// prompt. This is also what puts the app in the Accessibility list, so the
+/// user can flip the switch instead of hunting for it with the plus button.
+///
+/// Harmless to call more than once; macOS only prompts while the grant is
+/// missing.
+pub fn prompt_for_accessibility() {
+    use core_foundation::base::TCFType;
+    use core_foundation::boolean::CFBoolean;
+    use core_foundation::dictionary::CFDictionary;
+    use core_foundation::string::CFString;
+
+    let key = CFString::from_static_string("AXTrustedCheckOptionPrompt");
+    let value = CFBoolean::true_value();
+    let options = CFDictionary::from_CFType_pairs(&[(
+        key.as_CFType(),
+        value.as_CFType(),
+    )]);
+    unsafe {
+        AXIsProcessTrustedWithOptions(options.as_concrete_TypeRef() as *const core::ffi::c_void);
+    }
 }
 
 fn event_source() -> Option<CGEventSource> {
