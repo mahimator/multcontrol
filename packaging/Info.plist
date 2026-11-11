@@ -17,9 +17,9 @@
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.1.0</string>
+    <string>0.2.0</string>
     <key>CFBundleVersion</key>
-    <string>0.1.0</string>
+    <string>0.2.0</string>
     <key>LSMinimumSystemVersion</key>
     <string>11.0</string>
     <!-- Background agent: no Dock icon, no main window. -->
@@ -27,5 +27,8 @@
     <true/>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <!-- App icon (also used for the menu bar status item). -->
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
 </dict>
 </plist>

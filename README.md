@@ -20,6 +20,24 @@ connection over your local network.
    └───────────────────────┘                  └───────────────────────┘
 ```
 
+## Download a release (no build needed)
+
+[Releases](https://github.com/mahimator/multcontrol/releases) has two artifacts:
+
+| File | What it is |
+| --- | --- |
+| `multcontrol.exe` | Windows x64, self-contained binary. Run `multcontrol.exe selftest` to verify. |
+| `MultControl-<version>-macos.dmg` | Universal macOS app + installer. Run `Install MultControl.command` to set up the LaunchAgent and print the pairing key. |
+
+These builds are **not code-signed** (no paid Developer ID / Authenticode
+certificate). macOS will show the standard Gatekeeper warning the first time an
+unsigned app is opened; right-click → **Open** to proceed. Windows SmartScreen
+also warns on first run — click **More info → Run anyway**. If your organization
+blocks unsigned binaries by policy (AppLocker/WDAC), there is no workaround
+without a code‑signing certificate.
+
+---
+
 ## Why the PC dials out
 
 Windows cannot accept inbound connections without a firewall rule, and adding
@@ -31,12 +49,57 @@ either machine.
 On the Mac, the agent runs as a per-user LaunchAgent and asks for one thing:
 **Accessibility** permission, which is a normal per-user privacy setting.
 
+## The user interface
+
+The agent is a background app, but it is never invisible:
+
+| Platform | What you see |
+| --- | --- |
+| **Windows** | A **system tray icon** (bottom right, next to the clock). **Left-click** it to switch the keyboard and mouse to the other machine. **Right-click** it for a menu: *Toggle*, *Use this machine*, *Use the other machine*, *Quit*. Hovering shows the current state. |
+| **macOS** | A **menu bar icon** (top right). It is a template image, so it follows the light/dark appearance of the menu bar. Hovering shows the current state. Press **Ctrl+Alt+Space** to hand control over. |
+
+Both icons are the real application icon, embedded in the binary / app bundle.
+
+The state line is also available as text:
+
+```
+multcontrol status
+```
+
 ## Requirements
 
 * Windows 10 or 11, 64-bit. A normal user account — no administrator.
 * macOS 11 or newer (Apple silicon or Intel). No administrator.
 * Both machines on the same LAN.
 * Rust 1.75+ to build. The binaries have no runtime dependencies.
+
+## Verify before installing
+
+Before installing on a managed machine, run the binary's built‑in checks to
+confirm the platform works as expected:
+
+### Windows
+
+```powershell
+multcontrol.exe selftest
+```
+
+or, for a full handshake verification (without installing anything):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/smoke-windows.ps1 -Exe multcontrol.exe
+```
+
+### macOS
+
+```bash
+./multcontrol selftest
+```
+
+All checks are informational; exit code 0 means every hard test passed.
+Warnings (missing Accessibility, busy control port) do not fail the run.
+
+---
 
 ## Install
 
@@ -122,6 +185,7 @@ multcontrol doctor     check config, permissions and ports
 multcontrol psk        print this machine's pairing key
 multcontrol discover   find the peer with a UDP probe
 multcontrol where      print config and log paths
+multcontrol selftest   verify this binary works here (installs nothing)
 ```
 
 ## Configuration
@@ -203,6 +267,13 @@ return to the PC.
   Treat the key like a password; it is stored in a `chmod 600` file on the Mac.
 * There is no relay and no internet exposure: the agent only talks to the
   address it is configured with or discovers on the LAN.
+* **The Windows exe and macOS DMG are not code-signed.** macOS Gatekeeper will
+  warn on first launch; right-click → **Open** to proceed. Windows SmartScreen
+  also warns on first run — click **More info → Run anyway**. If your
+  organization blocks unsigned binaries by policy (AppLocker/WDAC), there is
+  no workaround without a code‑signing certificate. Run the
+  `multcontrol.exe selftest` command to prove the binary works on your machine
+  before installing.
 
 ## Building and testing
 
@@ -210,6 +281,16 @@ return to the PC.
 cargo test                     # protocol, crypto, key tables, state machine
 cargo build --release -p mc-agent
 cargo check --target x86_64-pc-windows-gnu -p mc-agent   # type-check the Windows side
+```
+
+The application icon is generated from `scripts/make-icon.py` (pure Python, no
+dependencies) into `assets/`. It is embedded into the Windows executable by
+`crates/mc-agent/build.rs` and into the macOS app bundle by
+`scripts/build-dmg.sh`.
+
+```bash
+python3 scripts/make-icon.py assets          # regenerate the icon
+bash scripts/build-dmg.sh                    # build the macOS disk image
 ```
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design, the wire

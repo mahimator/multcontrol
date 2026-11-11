@@ -13,6 +13,17 @@ use std::time::Duration;
 /// Port used by the local control channel.
 pub const CONTROL_PORT: u16 = 47779;
 
+/// The control port in use, overridable with `MULTControl_CONTROL_PORT`.
+///
+/// The override is useful for tests and for the rare machine where 47779 is
+/// already taken by something else.
+pub fn control_port() -> u16 {
+    std::env::var("MULTControl_CONTROL_PORT")
+        .ok()
+        .and_then(|value| value.trim().parse().ok())
+        .unwrap_or(CONTROL_PORT)
+}
+
 /// Requests the agent understands.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Command {
@@ -50,7 +61,7 @@ pub fn spawn(
     tx: Sender<Command>,
     describe: Arc<dyn Fn() -> String + Send + Sync>,
 ) -> std::io::Result<()> {
-    let addr = SocketAddr::from((Ipv4Addr::LOCALHOST, CONTROL_PORT));
+    let addr = SocketAddr::from((Ipv4Addr::LOCALHOST, control_port()));
     let listener = TcpListener::bind(addr)?;
     std::thread::Builder::new()
         .name("mc-control".into())
@@ -91,7 +102,7 @@ fn handle(
 
 /// Send a command to a running agent, returning its reply.
 pub fn request(text: &str) -> std::io::Result<String> {
-    let addr = SocketAddr::from((Ipv4Addr::LOCALHOST, CONTROL_PORT));
+    let addr = SocketAddr::from((Ipv4Addr::LOCALHOST, control_port()));
     let mut stream = TcpStream::connect_timeout(&addr, Duration::from_millis(800))?;
     stream.set_read_timeout(Some(Duration::from_millis(1500)))?;
     stream.write_all(text.as_bytes())?;
@@ -104,6 +115,6 @@ pub fn request(text: &str) -> std::io::Result<String> {
 
 /// Whether an agent is currently listening on the control port.
 pub fn agent_running() -> bool {
-    let addr = SocketAddr::from((Ipv4Addr::LOCALHOST, CONTROL_PORT));
+    let addr = SocketAddr::from((Ipv4Addr::LOCALHOST, control_port()));
     TcpStream::connect_timeout(&addr, Duration::from_millis(250)).is_ok()
 }

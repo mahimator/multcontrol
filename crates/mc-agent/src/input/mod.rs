@@ -17,7 +17,7 @@ use std::sync::Arc;
 #[cfg(target_os = "macos")]
 mod macos;
 #[cfg(target_os = "macos")]
-pub use macos::accessibility_trusted;
+pub use macos::{accessibility_trusted, prompt_for_accessibility};
 #[cfg(windows)]
 mod windows;
 
