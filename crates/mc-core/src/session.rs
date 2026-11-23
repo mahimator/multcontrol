@@ -337,10 +337,10 @@ impl SessionReader {
             Err(e) => return Err(e),
         }
         let len = u32::from_le_bytes([header[0], header[1], header[2], header[3]]);
-        if len > crate::proto::MAX_FRAME_LEN {
+        if len < NONCE_PREFIX_LEN + AUTH_TAG_LEN || len > MAX_SEALED_FRAME_LEN {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                "frame too large",
+                "invalid encrypted frame length",
             ));
         }
         let kind = header[4];
