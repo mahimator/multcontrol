@@ -69,7 +69,7 @@ multcontrol status
 * Windows 10 or 11, 64-bit. A normal user account — no administrator.
 * macOS 11 or newer (Apple silicon or Intel). No administrator.
 * Both machines on the same LAN.
-* Rust 1.75+ to build. The binaries have no runtime dependencies.
+* Rust 1.74+ to build. The binaries have no runtime dependencies.
 
 ## Verify before installing
 
