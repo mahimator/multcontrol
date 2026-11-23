@@ -324,10 +324,10 @@ impl Frame {
             Err(e) => return Err(e),
         }
         let len = u32::from_le_bytes(len_buf);
-        if len > MAX_FRAME_LEN {
+        if len == 0 || len > MAX_FRAME_LEN {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                "frame too large",
+                "invalid frame length",
             ));
         }
         let mut buf = vec![0u8; len as usize];
@@ -374,6 +374,15 @@ impl Frame {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rejects_empty_frame_without_panicking() {
+        let mut cursor = std::io::Cursor::new(0u32.to_le_bytes());
+        assert_eq!(
+            Frame::read_from(&mut cursor).unwrap_err().kind(),
+            io::ErrorKind::InvalidData
+        );
+    }
 
     #[test]
     fn frame_roundtrip() {
