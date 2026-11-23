@@ -22,19 +22,17 @@ connection over your local network.
 
 ## Download a release (no build needed)
 
-[Releases](https://github.com/mahimator/multcontrol/releases) has two artifacts:
+[Latest release](https://github.com/mahimator/multcontrol/releases/latest) includes ready-to-use downloads. **You do not need Rust or to build anything.**
 
-| File | What it is |
-| --- | --- |
-| `multcontrol.exe` | Windows x64, self-contained binary. Run `multcontrol.exe selftest` to verify. |
-| `MultControl-<version>-macos.dmg` | Universal macOS app + installer. Run `Install MultControl.command` to set up the LaunchAgent and print the pairing key. |
+| Download | Platform | Use |
+| --- | --- | --- |
+| `MultControl-<version>-macos.dmg` | Mac | Universal app + installer |
+| `multcontrol.exe` | Windows x64 | Standalone controller agent |
+| `install-windows.ps1` | Windows | Per-user installer |
+| `verify-windows.cmd` | Windows | Quick self-test |
+| `SHA256SUMS.txt` | Both | Integrity checks |
 
-These builds are **not code-signed** (no paid Developer ID / Authenticode
-certificate). macOS will show the standard Gatekeeper warning the first time an
-unsigned app is opened; right-click → **Open** to proceed. Windows SmartScreen
-also warns on first run — click **More info → Run anyway**. If your organization
-blocks unsigned binaries by policy (AppLocker/WDAC), there is no workaround
-without a code‑signing certificate.
+The release binaries carry signatures, but the publisher certificate is self-signed. macOS may show a Gatekeeper prompt on first open; Windows may show SmartScreen when launching the EXE directly. The included installers clear the download quarantine mark on the installed copy.
 
 ---
 
@@ -125,57 +123,32 @@ Warnings (missing Accessibility, busy control port) do not fail the run.
 
 ## Install
 
-### 1. Mac (the target)
+### 1. Mac (target)
 
-```bash
-git clone <this repo> multcontrol && cd multcontrol
-./scripts/install-macos.sh
-```
+1. Download and open the latest `macos.dmg` from [Releases](https://github.com/mahimator/multcontrol/releases/latest).
+2. Run **Install MultControl.command** from the mounted disk image.
+3. Copy the pairing key printed by the installer.
+4. Approve **MultControl** under System Settings → Privacy & Security → Accessibility if macOS prompts.
 
-The script builds the agent, installs `~/Applications/MultControl.app`,
-creates `~/Library/Application Support/MultControl/config.toml`, and starts a
-per-user LaunchAgent. It prints a **pairing key** — copy it.
+The installer places the app in `~/Applications`, creates a per-user LaunchAgent and starts it. A small **MC** icon appears in the menu bar.
 
-Then:
+### 2. Windows PC (controller)
 
-1. Open **System Settings → Privacy & Security → Accessibility** and enable
-   **MultControl**. (macOS also shows a prompt on first launch; the agent starts
-   capturing as soon as the switch is on.)
-2. Click **Allow** if macOS asks whether `multcontrol` may accept incoming
-   network connections. Declining this blocks the PC.
-
-A small **MC** item appears in the menu bar. It shows `MC offline`, `MC idle`,
-`MC controlled`, or `MC !` when Accessibility is missing.
-
-### 2. Windows PC (the controller)
-
-Build on the Windows machine:
+1. Download **multcontrol.exe** and **install-windows.ps1** from the same release into one folder.
+2. Run this in PowerShell:
 
 ```powershell
-cargo build --release -p mc-agent
-powershell -ExecutionPolicy Bypass -File .\scripts\install-windows.ps1
+powershell -ExecutionPolicy Bypass -File .\install-windows.ps1
 ```
 
-The installer asks for the Mac's pairing key and (optionally) its LAN address,
-copies the binary to `%LOCALAPPDATA%\Programs\MultControl`, writes the config to
-`%LOCALAPPDATA%\MultControl\config.toml`, and registers a
-`HKCU\Software\Microsoft\Windows\CurrentVersion\Run` entry so it starts at
-login. It then starts the agent in the background.
+3. Paste the Mac's pairing key when prompted.
+4. Enter the Mac's LAN IP if automatic discovery fails, or leave it blank to try discovery.
 
-If you leave the address blank, the agent finds the Mac with a UDP broadcast on
-port 47777. A static address is more reliable if your router blocks broadcasts.
+The installer places the agent under your user profile, registers it to start at login, and runs it. No administrator rights or firewall rules are needed.
 
-### Cross-compiling the Windows binary from macOS
+### 3. Switch between machines
 
-Optional. You need mingw-w64 (`brew install mingw-w64`):
-
-```bash
-rustup target add x86_64-pc-windows-gnu
-cargo build --release -p mc-agent --target x86_64-pc-windows-gnu
-```
-
-Copy `target/x86_64-pc-windows-gnu/release/multcontrol.exe` to the PC and run the
-installer with `-Source`.
+Press **Ctrl+Alt+Space** on either machine, or left-click the Windows tray icon. You can also push the pointer off the screen edge to hand over control.
 
 ## Using it
 
