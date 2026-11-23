@@ -1,7 +1,8 @@
 //! Session setup: handshake, key derivation and encrypted framing.
 
 use crate::crypto::{
-    ack_tag, derive_keys, hello_tag, random_nonce, Crypter, Psk, HANDSHAKE_TAG_LEN,
+    ack_tag, derive_keys, hello_tag, random_nonce, Crypter, Psk, AUTH_TAG_LEN, HANDSHAKE_TAG_LEN,
+    MAX_HANDSHAKE_BODY_LEN, NONCE_PREFIX_LEN,
 };
 use crate::key::Key;
 use crate::proto::{Frame, InputEvent, PROTOCOL_VERSION};
@@ -14,6 +15,10 @@ use std::time::Duration;
 const KIND_HELLO: u8 = 0xF0;
 /// Frame kind used for the plaintext handshake reply.
 const KIND_HELLO_ACK: u8 = 0xF1;
+/// Bound unauthenticated handshake reads before allocating memory.
+const MAX_HANDSHAKE_FRAME_LEN: usize = MAX_HANDSHAKE_BODY_LEN + HANDSHAKE_TAG_LEN;
+/// Bound encrypted frames including their nonce and authentication tag.
+const MAX_SEALED_FRAME_LEN: usize = crate::proto::MAX_FRAME_LEN as usize + NONCE_PREFIX_LEN + AUTH_TAG_LEN;
 
 /// Handshake payload, sent in the clear but authenticated by the tag.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -275,10 +280,10 @@ impl Session {
             Err(e) => return Err(e),
         }
         let len = u32::from_le_bytes([header[0], header[1], header[2], header[3]]);
-        if len > crate::proto::MAX_FRAME_LEN {
+        if len < NONCE_PREFIX_LEN + AUTH_TAG_LEN || len > MAX_SEALED_FRAME_LEN {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                "frame too large",
+                "invalid encrypted frame length",
             ));
         }
         let kind = header[4];
@@ -412,10 +417,10 @@ fn read_plain<R: Read>(reader: &mut R) -> io::Result<(u8, Vec<u8>, Vec<u8>)> {
     let mut header = [0u8; 5];
     reader.read_exact(&mut header)?;
     let len = u32::from_le_bytes([header[0], header[1], header[2], header[3]]) as usize;
-    if len < HANDSHAKE_TAG_LEN {
+    if len < HANDSHAKE_TAG_LEN || len > MAX_HANDSHAKE_FRAME_LEN {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
-            "short handshake",
+            "invalid handshake frame length",
         ));
     }
     let mut buf = vec![0u8; len];
@@ -448,3 +453,26 @@ const _: fn() = || {
     // Compile-time reminder that `Key` must stay `Copy`.
     let _ = Key::A;
 };
+
+
+#[cfg(test)]
+mod framing_tests {
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn handshake_reader_rejects_oversized_frame_before_allocating() {
+        let mut header = [0u8; 5];
+        header[..4].copy_from_slice(&((MAX_HANDSHAKE_FRAME_LEN as u32 + 1).to_le_bytes()));
+        let mut cursor = Cursor::new(header);
+        assert_eq!(read_plain(&mut cursor).unwrap_err().kind(), io::ErrorKind::InvalidData);
+    }
+
+    #[test]
+    fn handshake_reader_rejects_short_tag() {
+        let mut header = [0u8; 5];
+        header[..4].copy_from_slice(&((HANDSHAKE_TAG_LEN as u32 - 1).to_le_bytes()));
+        let mut cursor = Cursor::new(header);
+        assert_eq!(read_plain(&mut cursor).unwrap_err().kind(), io::ErrorKind::InvalidData);
+    }
+}
