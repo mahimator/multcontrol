@@ -414,6 +414,10 @@ impl Agent {
             Command::Status => {}
             Command::Quit => {
                 log::info!("shutting down on request");
+                // Do not leave a remote machine with a stuck key or button if
+                // shutdown happens during a chord, drag, or active handoff.
+                self.release_forwarded_input();
+                self.release_injected_input();
                 self.send(Frame::Control(ControlMsg::Bye));
                 self.backend.set_suppress(false);
                 self.backend.set_cursor_visible(true);
