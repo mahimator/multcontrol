@@ -1025,4 +1025,54 @@ mod tests {
         settle();
         assert_eq!(h.backend.injected().len(), before);
     }
+    #[test]
+    fn quit_releases_forwarded_and_injected_input() {
+        let controller = harness(ControlRole::Controller);
+        assert!(matches!(next_frame(&controller), Frame::Control(ControlMsg::State { target: Target::Local })));
+        controller.events.send(Event::Capture(CaptureEvent::Hotkey)).unwrap();
+        let _ = next_frame(&controller); // State Remote
+        let _ = next_frame(&controller); // PointerEdge
+        controller.events.send(Event::Capture(CaptureEvent::Key {
+            action: KeyAction::Down,
+            key: mc_core::key::Key::A,
+            mods: 0,
+        })).unwrap();
+        assert!(matches!(next_frame(&controller), Frame::Input(InputEvent::Key { action: KeyAction::Down, .. })));
+        controller.events.send(Event::Capture(CaptureEvent::MouseButton {
+            button: MouseButton::Left,
+            pressed: true,
+        })).unwrap();
+        assert!(matches!(next_frame(&controller), Frame::Input(InputEvent::MouseButton { pressed: true, .. })));
+        controller.events.send(Event::Command(Command::Quit)).unwrap();
+        assert!(matches!(next_frame(&controller), Frame::Input(InputEvent::Key { action: KeyAction::Up, .. })));
+        assert!(matches!(next_frame(&controller), Frame::Input(InputEvent::MouseButton { pressed: false, .. })));
+        assert!(matches!(next_frame(&controller), Frame::Control(ControlMsg::Bye)));
+        settle();
+        assert!(!controller.backend.suppressed.load(Ordering::SeqCst));
+
+        let target = harness(ControlRole::Target);
+        target.events.send(Event::Net(NetEvent::Frame(Frame::Control(ControlMsg::State {
+            target: Target::Remote,
+        })))).unwrap();
+        settle();
+        target.events.send(Event::Net(NetEvent::Frame(Frame::Input(InputEvent::Key {
+            action: KeyAction::Down,
+            key: mc_core::key::Key::B.id(),
+            mods: 0,
+        })))).unwrap();
+        target.events.send(Event::Net(NetEvent::Frame(Frame::Input(InputEvent::MouseButton {
+            button: MouseButton::Right,
+            pressed: true,
+        })))).unwrap();
+        settle();
+        target.events.send(Event::Command(Command::Quit)).unwrap();
+        assert!(matches!(next_frame(&target), Frame::Control(ControlMsg::Bye)));
+        settle();
+        let injected = target.backend.injected();
+        assert!(injected.iter().any(|s| s == "key:Up:B:0"));
+        assert!(injected.iter().any(|s| s == "button:Right:false"));
+        assert!(!target.backend.suppressed.load(Ordering::SeqCst));
+    }
+
+
 }
