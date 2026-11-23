@@ -263,7 +263,7 @@ pub const NONCE_BYTES: usize = NONCE_LEN;
 /// Expected size of the hello/ack authentication tag.
 pub const HANDSHAKE_TAG_LEN: usize = 32;
 /// Maximum length of the hello/ack body that is authenticated.
-pub const MAX_HANDSHAKE_BODY_LEN: usize = INFO_LEN;
+pub const MAX_HANDSHAKE_BODY_LEN: usize = 64 * 1024;
 
 #[cfg(test)]
 mod tests {
