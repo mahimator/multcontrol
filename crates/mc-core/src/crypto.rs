@@ -21,7 +21,6 @@ type HmacSha256 = Hmac<Sha256>;
 const PSK_LEN: usize = 32;
 const NONCE_LEN: usize = 12;
 const TAG_LEN: usize = 16;
-const INFO_LEN: usize = 16;
 
 /// Per-session encryption keys, one per direction.
 pub struct SessionKeys {
