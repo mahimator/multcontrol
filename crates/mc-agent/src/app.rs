@@ -279,10 +279,17 @@ impl Agent {
                 self.out = Some(tx);
                 self.connected = true;
                 self.peer = Some(info.name.clone());
+                // Clipboard history is session-local. Reconnect must send the
+                // controller's current clipboard even if it was sent before the
+                // previous connection dropped.
+                self.last_clipboard_sent.clear();
+                self.last_clipboard_received.clear();
                 log::info!("connected to {} ({})", info.name, info.platform);
                 if self.cfg.control.role == ControlRole::Controller {
-                    // We are authoritative: bring the peer in sync.
+                    // We are authoritative: bring the peer in sync and publish
+                    // the controller's current clipboard on every fresh session.
                     self.send(Frame::Control(ControlMsg::State { target: self.focus }));
+                    self.push_clipboard();
                 } else {
                     // The target learns where input is from the next State
                     // frame; until then it must not inject anything.
@@ -369,7 +376,7 @@ impl Agent {
     }
 
     fn on_local_clipboard(&mut self, text: String) {
-        if !self.cfg.input.sync_clipboard || text.is_empty() {
+        if !self.cfg.input.sync_clipboard || !self.connected || text.is_empty() {
             return;
         }
         if text.len() > MAX_CLIPBOARD_BYTES {
