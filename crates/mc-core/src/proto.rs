@@ -202,7 +202,7 @@ impl InputEvent {
     pub fn decode(kind: u8, payload: &[u8]) -> Option<InputEvent> {
         Some(match kind {
             kind::KEY => {
-                if payload.len() < 4 {
+                if payload.len() != 4 {
                     return None;
                 }
                 InputEvent::Key {
@@ -221,7 +221,7 @@ impl InputEvent {
                 }
             }
             kind::MOUSE_BUTTON => {
-                if payload.len() < 2 {
+                if payload.len() != 2 || payload[1] > 1 {
                     return None;
                 }
                 InputEvent::MouseButton {
@@ -239,7 +239,7 @@ impl InputEvent {
                 }
             }
             kind::POINTER_EDGE => {
-                if payload.is_empty() {
+                if payload.len() != 1 {
                     return None;
                 }
                 InputEvent::PointerEdge(Edge::from_code(payload[0])?)
@@ -420,4 +420,14 @@ mod tests {
         }
         assert!(Frame::read_from(&mut cursor).unwrap().is_none());
     }
+    #[test]
+    fn rejects_malformed_input_payload_lengths_and_button_values() {
+        assert!(InputEvent::decode(kind::KEY, &[0, 1, 0, 0, 0]).is_none());
+        assert!(InputEvent::decode(kind::MOUSE_MOVE, &[0, 0, 0, 0, 0]).is_none());
+        assert!(InputEvent::decode(kind::MOUSE_BUTTON, &[0, 2]).is_none());
+        assert!(InputEvent::decode(kind::WHEEL, &[0, 0, 0, 0, 0]).is_none());
+        assert!(InputEvent::decode(kind::POINTER_EDGE, &[1, 0]).is_none());
+    }
+
+
 }
