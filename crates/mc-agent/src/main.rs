@@ -398,6 +398,13 @@ fn spawn_clipboard_poller(tx: Sender<Event>, poll_ms: u64) {
             loop {
                 std::thread::sleep(std::time::Duration::from_millis(poll_ms.max(50)));
                 let current = clipboard::get_text();
+                // Establish a baseline on startup. The controller publishes its
+                // current clipboard explicitly after each connection, so sending
+                // both initial snapshots here would create a race between peers.
+                if last.is_none() {
+                    last = current;
+                    continue;
+                }
                 if current != last {
                     last = current.clone();
                     if let Some(text) = current {
